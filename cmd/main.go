@@ -6,6 +6,19 @@ import (
 	"net"
 )
 
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	for {
+		msg, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading message")
+		} else {
+			fmt.Print("(" + conn.RemoteAddr().String() + "): " + string(msg))
+		}
+	}
+}
+
 func main() {
 	fmt.Println("Start server...")
 
@@ -14,18 +27,13 @@ func main() {
 		fmt.Println("Error binding to port")
 	}
 
-	conn, err := ln.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection")
-	}
+	defer ln.Close()
 
 	for {
-		msg, err := bufio.NewReader(conn).ReadString('\n')
+		conn, err := ln.Accept()
 		if err != nil {
-			fmt.Println("Error reading message")
-		} else {
-			fmt.Print("Message Received:", string(msg))
-
+			fmt.Println("Error accepting connection")
 		}
+		go handleConnection(conn)
 	}
 }
