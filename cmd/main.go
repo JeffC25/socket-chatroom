@@ -6,21 +6,35 @@ import (
 	"net"
 )
 
-func handleConnection(conn net.Conn, c chan string) {
-	defer conn.Close()
+type client struct {
+	Conn	net.Conn
+	Address	string
+	Name	string
+}
+
+//type message struct {
+//	Client	client
+//	Time	time.Time
+//	Content	string
+//}
+
+func (c client) handleConnection(m chan string) {
+	defer c.Conn.Close()
 
 	for {
-		msg, err := bufio.NewReader(conn).ReadString('\n')
+		msg, err := bufio.NewReader(c.Conn).ReadString('\n')
 		if err != nil {
 			fmt.Println("Error reading message")
 		} else {
-			c <- ("(" + conn.RemoteAddr().String() + "): " + string(msg))
+			m <- ("(" + c.Conn.RemoteAddr().String() + "): " + string(msg))
 		}
 	}
 }
 
 func main() {
 	fmt.Println("Start server...")
+	
+//	var clients []client
 
 	ln, err := net.Listen("tcp", ":8000")
 	if err != nil {
@@ -29,11 +43,11 @@ func main() {
 
 	defer ln.Close()
 
-	c := make(chan string)
+	m := make(chan string)
 
 	go func() {
 		for {
-			fmt.Print(<- c)
+			fmt.Print(<- m)
 		}
 	}()
 
@@ -42,6 +56,11 @@ func main() {
 		if err != nil {
 			fmt.Println("Error accepting connection")
 		}
-		go handleConnection(conn, c)
+		
+		var c = client{
+			Conn: conn,
+			Name: "",
+		}
+		go c.handleConnection(m)
 	}
 }
