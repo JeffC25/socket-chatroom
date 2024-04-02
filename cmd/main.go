@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"time"
 )
@@ -19,13 +20,16 @@ type message struct {
 	Content	string
 }
 
-func (c client) handleConnection(m chan string) {
+func (c client) HandleConnection(m chan string) {
 	defer c.Conn.Close()
 
 	for {
 		msg, err := bufio.NewReader(c.Conn).ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading message")
+		if err == io.EOF {
+			fmt.Println(c.Conn.RemoteAddr().String(), "disconnected")
+			return
+		} else if err != nil {
+			fmt.Println("Error reading message", err)
 		} else {
 			m <- ("(" + c.Conn.RemoteAddr().String() + "): " + string(msg))
 		}
@@ -51,8 +55,9 @@ func main() {
 			select {
 			case msg := <- m:
 				for _, c := range clients {
-					// fmt.Println(c.Conn.RemoteAddr().String())
+					fmt.Println(msg)
 					c.Conn.Write([]byte(msg))
+					
 				}
 			}
 		}
@@ -69,6 +74,6 @@ func main() {
 			Name: "",
 		}
 		clients = append(clients, c)
-		go c.handleConnection(m)
+		go c.HandleConnection(m)
 	}
 }
