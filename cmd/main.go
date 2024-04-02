@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"time"
 )
 
 type client struct {
@@ -12,11 +13,11 @@ type client struct {
 	Name	string
 }
 
-//type message struct {
-//	Client	client
-//	Time	time.Time
-//	Content	string
-//}
+type message struct {
+	Client	client
+	Time	time.Time
+	Content	string
+}
 
 func (c client) handleConnection(m chan string) {
 	defer c.Conn.Close()
@@ -34,7 +35,7 @@ func (c client) handleConnection(m chan string) {
 func main() {
 	fmt.Println("Start server...")
 	
-//	var clients []client
+	var clients []client
 
 	ln, err := net.Listen("tcp", ":8000")
 	if err != nil {
@@ -47,7 +48,13 @@ func main() {
 
 	go func() {
 		for {
-			fmt.Print(<- m)
+			select {
+			case msg := <- m:
+				for _, c := range clients {
+					// fmt.Println(c.Conn.RemoteAddr().String())
+					c.Conn.Write([]byte(msg))
+				}
+			}
 		}
 	}()
 
@@ -61,6 +68,7 @@ func main() {
 			Conn: conn,
 			Name: "",
 		}
+		clients = append(clients, c)
 		go c.handleConnection(m)
 	}
 }
