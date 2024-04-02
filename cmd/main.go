@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, c chan string) {
 	defer conn.Close()
 
 	for {
@@ -14,7 +14,7 @@ func handleConnection(conn net.Conn) {
 		if err != nil {
 			fmt.Println("Error reading message")
 		} else {
-			fmt.Print("(" + conn.RemoteAddr().String() + "): " + string(msg))
+			c <- ("(" + conn.RemoteAddr().String() + "): " + string(msg))
 		}
 	}
 }
@@ -29,11 +29,19 @@ func main() {
 
 	defer ln.Close()
 
+	c := make(chan string)
+
+	go func() {
+		for {
+			fmt.Print(<- c)
+		}
+	}()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection")
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, c)
 	}
 }
