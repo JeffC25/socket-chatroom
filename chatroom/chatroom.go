@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/jeffc25/socket-chatroom/config"
 )
 
 type Message struct {
@@ -17,19 +19,21 @@ type ChatRoom struct {
 	Clients     map[*Client]bool
 	Connects    chan *Client
 	Disconnects chan *Client
+	Config      config.Config
 }
 
-func NewChatRoom() *ChatRoom {
+func NewChatRoom(c config.Config) *ChatRoom {
 	return &ChatRoom{
 		Broadcast:   make(chan Message),
 		Clients:     make(map[*Client]bool),
 		Connects:    make(chan *Client),
 		Disconnects: make(chan *Client),
+		Config:      c,
 	}
 }
 
 func (cr *ChatRoom) Run() {
-	ln, err := net.Listen("tcp", ":8000")
+	ln, err := net.Listen("tcp", ":"+cr.Config.Port)
 	if err != nil {
 		fmt.Println("Error binding to port")
 	}

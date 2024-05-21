@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/jeffc25/socket-chatroom/chatroom"
+	"github.com/jeffc25/socket-chatroom/config"
 )
 
 func main() {
@@ -14,7 +15,14 @@ func main() {
 	signal.Notify(notifyCh, syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println("Starting server...")
 
-	cr := chatroom.NewChatRoom()
+	c, err := config.GetConfig()
+	if err != nil {
+		fmt.Println("Error getting config:", err)
+		c.Host = "localhost"
+		c.Port = "8000"
+	}
+
+	cr := chatroom.NewChatRoom(c)
 
 	go cr.Run()
 
