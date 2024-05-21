@@ -1,3 +1,3 @@
-module github.com/jeffc25/peer-to-peer-demo
+module github.com/jeffc25/socket-chatroom
 
 go 1.21.4
