@@ -49,6 +49,7 @@ func (cr *ChatRoom) Run() {
 				Room:    *cr,
 			}
 			cr.Connects <- &c
+			fmt.Println("New connection:", c.Address)
 		}
 	}()
 
@@ -62,9 +63,11 @@ func (cr *ChatRoom) Run() {
 		case c := <-cr.Connects:
 			cr.Clients[c] = true
 			c.GetName()
+			fmt.Printf("%s (%s) %s connected to chatroom\n", time.Now().Local().Format(time.RFC3339), c.Name, c.Address)
 			go c.SendMessage()
 		case conn := <-cr.Disconnects:
 			delete(cr.Clients, conn)
+			fmt.Printf("%s (%s) %s disconnected from chatroom\n", time.Now().Local().Format(time.RFC3339), conn.Name, conn.Address)
 		}
 	}
 }
