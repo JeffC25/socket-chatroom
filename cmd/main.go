@@ -1,79 +1,109 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"io"
-	"net"
-	"time"
+    "fmt"
+    "io"
+    "net"
+    "strings"
+    "sync"
+    "time"
 )
 
-type client struct {
-	Conn	net.Conn
-	Address	string
-	Name	string
-}
-
 type message struct {
-	Client	client
-	Time	time.Time
-	Content	string
+    Sender    string
+    Timestamp time.Time
+    Content   string
 }
 
-func (c client) HandleConnection(m chan string) {
-	defer c.Conn.Close()
+type client struct {
+    Conn     net.Conn
+    Name     string
+    Messages chan message
+}
 
-	for {
-		msg, err := bufio.NewReader(c.Conn).ReadString('\n')
-		if err == io.EOF {
-			fmt.Println(c.Conn.RemoteAddr().String(), "disconnected")
-			return
-		} else if err != nil {
-			fmt.Println("Error reading message", err)
-		} else {
-			m <- ("(" + c.Conn.RemoteAddr().String() + "): " + string(msg))
-		}
-	}
+var (
+    broadcast = make(chan message)
+    mutex     sync.Mutex
+)
+
+func (c *client) readMessages() {
+    defer c.Conn.Close()
+
+    // Send a prompt to the client to enter a name
+    c.Conn.Write([]byte("Please enter your name: "))
+
+    // Read messages without using bufio
+    buf := make([]byte, 1024)
+    for {
+        n, err := c.Conn.Read(buf)
+        if err == io.EOF {
+            fmt.Println(c.Conn.RemoteAddr().String(), "disconnected")
+            return
+        } else if err != nil {
+            fmt.Println("Error reading message:", err)
+            return
+        }
+
+        msg := string(buf[:n])
+
+        if c.Name == "" {
+            c.Name = strings.TrimSpace(msg)
+            fmt.Printf("New client connected with name: %s\n", c.Name)
+            continue
+        }
+
+        mutex.Lock()
+        broadcast <- message{
+            Sender:    c.Name,
+            Timestamp: time.Now(),
+            Content:   msg,
+        }
+        mutex.Unlock()
+    }
+}
+
+func (c *client) writeMessages() {
+    defer c.Conn.Close()
+
+    for msg := range c.Messages {
+        _, err := c.Conn.Write([]byte(fmt.Sprintf("(%s %s): %s", msg.Sender, msg.Timestamp.Format(time.Stamp), msg.Content)))
+        if err != nil {
+            fmt.Println("Error writing message to client:", err)
+            return
+        }
+    }
 }
 
 func main() {
-	fmt.Println("Start server...")
-	
-	var clients []client
+    fmt.Println("Start server...")
+    ln, err := net.Listen("tcp", ":8000")
+    if err != nil {
+        fmt.Println("Error binding to port:", err)
+        return
+    }
+    defer ln.Close()
 
-	ln, err := net.Listen("tcp", ":8000")
-	if err != nil {
-		fmt.Println("Error binding to port")
-	}
+    for {
+        conn, err := ln.Accept()
+        if err != nil {
+            fmt.Println("Error accepting connection:", err)
+            continue
+        }
 
-	defer ln.Close()
+        clientMessages := make(chan message)
+        client := &client{
+            Conn:     conn,
+            Messages: clientMessages,
+        }
 
-	m := make(chan string)
+        go client.writeMessages()
+        go client.readMessages()
 
-	go func() {
-		for {
-			select {
-			case msg := <- m:
-				for _, c := range clients {
-					fmt.Println(msg)
-					c.Conn.Write([]byte(msg))
-					
-				}
-			}
-		}
-	}()
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection")
-		}
-		
-		var c = client{
-			Conn: conn,
-			Name: "",
-		}
-		clients = append(clients, c)
-		go c.HandleConnection(m)
-	}
+        go func() {
+            for {
+                msg := <-broadcast
+                clientMessages <- msg
+            }
+        }()
+    }
 }
